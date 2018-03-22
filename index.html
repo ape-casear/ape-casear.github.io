@@ -1,10 +1,272 @@
 <!DOCTYPE html>
 <html>
-<head>
+
+  <head>
+
+	<style type="text/css">
+	#table{
+		width:360px;
+		height:360px;
+		background-color:#333;
+	}
+	img{
+		width:10px;
+		height:10px;
+	}
+	</style>
+	<script src="http://libs.baidu.com/jquery/2.1.4/jquery.min.js"></script>
+	<script type="text/javascript">
+	//蛇头
+	let snakeHead={"hx":9,"hy":8,"vector":"NORTH","img":null,"length":3};
+	//砖块
+	function block(x,y){
+		this.bx=x;
+		this.by=y;
+		this.isSnakeBody=false;
+		this.isBall=false;
+		this.img=null;
+	}
+
+	//地图大小
+	let size=36;
+	//图片变量
+	let img1="imge/123.png";
+	let img2="imge/345.png";
+	let img3="imge/ball.png";
+	let presscount=false; //按键次数  用来使interval函数只执行一次
+	let die=false;
+	//默认速度
+	var speed=200;
+	//给table（地图）初始化
+	$(function(){
+		var table=$('#table')[0];
+		
+		var rows=new Array(size);
+		for(i_1=0;i_1<size;i_1++){
+			rows[i_1]=new Array(size);
+		}
+		for(i_2=0;i_2<size;i_2++){
+			for(j_2=0;j_2<size;j_2++){
+				//每一个rows[][]就是一个小块 block
+				rows[i_2][j_2]=new block(i_2,j_2);
+				//给每个block的附上img
+				var tempImg=document.createElement("img");
+				tempImg.src=img2;
+				rows[i_2][j_2].img=tempImg;
+				//把小块的图显示到table中，即是在div中
+				table.appendChild(tempImg);
+			}
+		}
+	
+		//给蛇头上img
+		var headImg=document.createElement("img");
+		headImg.src=img1;
+		snakeHead.img=headImg;
+		//设置lock，使得蛇每移动一次，才能有按键下一次的操作（防止按得太快，在蛇向下走的时候，在一次间隔内，按了左、上，就判断自己撞了自己）
+		var lock=false;
+		//按键判断
+		function setVector(e){
+			if(lock){
+				return;
+			}
+			if(e.keyCode==119){
+				//alert("你按了w");
+				if(snakeHead.vector=="SOUTH"){ //向南走的过程中不能换方向向北
+					return;					
+				}
+				snakeHead.vector="NORTH";
+			}else if(e.keyCode==97){
+				//alert("你按了a");
+				if(snakeHead.vector=="EAST"){
+					return;					
+				}
+				snakeHead.vector="WEST";
+			}else if(e.keyCode==115){
+				//alert("你按了s");
+				if(snakeHead.vector=="NORTH"){
+					return;					
+				}
+				snakeHead.vector="SOUTH";
+			}else{
+				//alert("你按了d");
+				if(snakeHead.vector=="WEST"){
+					return;					
+				}
+				snakeHead.vector="EAST";
+			}
+			lock=true;
+		}
+		//放球
+		function putBall(){
+			var bx=Math.floor(Math.random()*size);
+			var by=Math.floor(Math.random()*size);
+			if(rows[bx][by].isSnakeBody==false){
+				rows[bx][by].isBall=true;
+				rows[bx][by].img.src=img3;
+			}else{
+				putBall();
+			}
+		}
+		
+		//死了
+		function youDIE(){
+			alert("you die")
+			die=true;
+		}
+		//蛇身变回砖块
+		function backToBlock(x,y){
+			rows[x][y].img.src=img2;
+			rows[x][y].isSnakeBody=false;
+		}
+		//检查有没有撞自己身上了
+		function dieCheck(xx,yy){
+			if(rows[xx][yy].isSnakeBody==true){
+				youDIE();
+				return true;
+			}else{}
+				return false;
+		}
+		//吃到球了
+		function checkBall(cx,cy){
+			if(rows[cx][cy].isBall==true){
+				snakeHead.length++;
+				rows[cx][cy].isBall=false;
+				putBall();
+			}
+		}
+		//用来存放蛇身
+		var snakelist=[];
+		
+		//触发按键
+		$(document).keypress(function(e){
+			//设置方向			
+			setVector(e);
+			//如果是第一次以后按键事件，就直接return，不再开启新的线程执行setInterval了，
+			if(presscount){
+				return;
+			}
+			//若是点击了难度选择，就根据选择设置难度
+			var level=$('.level:checked').val();
+			if(level!=null&&level!=undefined){speed=level;}
+			//蛇的移动
+			var inter=setInterval(function interval(){   //这个不把interval包起来就不会重复执行。。
+				
+				if(snakeHead.vector=="NORTH"){
+					//撞墙判断
+					if(snakeHead.hx-1<0){
+						youDIE();
+						if(die==true){clearInterval(inter)}
+						return;
+					}
+					//撞身体判断
+					var check=dieCheck(snakeHead.hx-1,snakeHead.hy);
+					if(check){
+						clearInterval(inter);
+						return;
+					}
+					//砖块被蛇头踩过后变蛇身了
+					rows[snakeHead.hx-1][snakeHead.hy].img.src=img1;
+					rows[snakeHead.hx-1][snakeHead.hy].isSnakeBody=true;
+					snakeHead.hx=snakeHead.hx-1;
+					checkBall(snakeHead.hx,snakeHead.hy);
+					//将被踩过的block的位置记录起来，snakelist蛇身中
+					snakelist.push(snakeHead.hx);
+					snakelist.push(snakeHead.hy);
+					//固定时间后（蛇身长度），蛇身变回砖块
+					setTimeout(function(){
+						//从蛇身记录器中取出之前被踩过的block的位置
+						tempX=snakelist.shift();
+						tempY=snakelist.shift();
+						backToBlock(tempX,tempY);
+					},snakeHead.length*speed);
+				}else if(snakeHead.vector=="WEST"){
+					if(snakeHead.hy-1<0){
+						youDIE();
+						if(die==true){clearInterval(inter)}
+						return;
+					}
+					var check=dieCheck(snakeHead.hx,snakeHead.hy-1);
+					if(check){
+						clearInterval(inter);
+						return;
+					}
+					rows[snakeHead.hx][snakeHead.hy-1].img.src=img1;
+					rows[snakeHead.hx][snakeHead.hy-1].isSnakeBody=true;
+					snakeHead.hy=snakeHead.hy-1;
+					checkBall(snakeHead.hx,snakeHead.hy);
+					snakelist.push(snakeHead.hx);
+					snakelist.push(snakeHead.hy);
+					setTimeout(function(){
+						tempX=snakelist.shift();
+						tempY=snakelist.shift();
+						backToBlock(tempX,tempY);
+					},snakeHead.length*speed);
+					
+				}else if(snakeHead.vector=="SOUTH"){
+					if(snakeHead.hx+1>size-1){
+						youDIE();
+						if(die==true){clearInterval(inter)}
+						return;
+					}
+					var check=dieCheck(snakeHead.hx+1,snakeHead.hy);
+					if(check){
+						clearInterval(inter);
+						return;
+					}
+					rows[snakeHead.hx+1][snakeHead.hy].img.src=img1;
+					rows[snakeHead.hx+1][snakeHead.hy].isSnakeBody=true;
+					snakeHead.hx=snakeHead.hx+1;
+					checkBall(snakeHead.hx,snakeHead.hy);
+					snakelist.push(snakeHead.hx);
+					snakelist.push(snakeHead.hy);
+					setTimeout(function(){
+						tempX=snakelist.shift();
+						tempY=snakelist.shift();
+						backToBlock(tempX,tempY);
+					},snakeHead.length*speed);
+				}else{
+					if(snakeHead.hy+1>size-1){
+						youDIE();
+						if(die==true){clearInterval(inter)}
+						return;
+					}
+					var check=dieCheck(snakeHead.hx,snakeHead.hy+1);
+					if(check){
+						clearInterval(inter);
+						return;
+					}
+					rows[snakeHead.hx][snakeHead.hy+1].img.src=img1;
+					rows[snakeHead.hx][snakeHead.hy+1].isSnakeBody=true;
+					snakeHead.hy=snakeHead.hy+1;
+					checkBall(snakeHead.hx,snakeHead.hy);
+					snakelist.push(snakeHead.hx);
+					snakelist.push(snakeHead.hy);
+					setTimeout(function(){
+						tempX=snakelist.shift();
+						tempY=snakelist.shift();
+						backToBlock(tempX,tempY);
+					},snakeHead.length*speed);
+				}
+				lock=false;
+			},speed);
+			presscount=true;
+			putBall();
+			
+			
+		});
+		
+	});	
+	</script>
+  </head>
   
-</head>
-  
-<body>
-  <center><h1>welcome to my blog</h1></center>
-</body>
+  <body>
+  <center>
+    <h1>贪吃蛇游戏 -wdw</h1>
+    <div id="table"></div>
+    <input type="radio" class="level" name="level" value="200" />slow
+    <input type="radio" class="level" name="level" value="150" />medium
+    <input type="radio" class="level" name="level" value="100" />fast<br/>
+     <input type="button"  onclick="location.reload() "  value="重新开始"/>
+    </center>
+  </body>
 </html>
